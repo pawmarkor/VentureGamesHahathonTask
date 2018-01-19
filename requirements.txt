@@ -7,3 +7,4 @@ Werkzeug==0.12.2
 pytest==3.2.3
 pytest-flask==0.10.0
 requests==2.18.4
+pathlib==1.0.1

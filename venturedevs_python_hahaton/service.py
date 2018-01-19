@@ -1,9 +1,12 @@
+# -*- coding: utf-8 -*-
+
 import requests
 from datetime import datetime
+from pathlib import Path
 import os
 import csv
 
-from .settings import FORECASTS_DIR, API_URL
+from .settings import FORECASTS_DIR, API_URL, FIELDS_ORDER
 
 
 def get_forecasts_from_api(woeid):
@@ -15,7 +18,12 @@ def get_forecasts_from_api(woeid):
     wartość 'None'. W każdym innym przypadku funkcja powinna zwrócić obiekt
     typu 'dict' z zawartości odpowiedzi.
     """
-    pass
+    response = requests.get("{api_url}/api/location/{woeid}/".format(
+        api_url=API_URL,
+        woeid=woeid,
+    ))
+    if response.status_code != 404:
+        return response.json()
 
 
 def forecast_to_list(forecast):
@@ -25,7 +33,14 @@ def forecast_to_list(forecast):
     Funkcja korzysta z danych znajdujących się pod kluczem
     'consolidated_weather'.
     """
-    pass
+    try:
+        consolidated_weather = forecast['consolidated_weather']
+    except KeyError:
+        return []
+    return [
+        [entry[field_name] for field_name in FIELDS_ORDER]
+        for entry in consolidated_weather
+    ]
 
 
 def get_forecast_file_path(woeid):
@@ -39,13 +54,16 @@ def get_forecast_file_path(woeid):
     Nazwa pliku powinna zawierać znacznik czasu (HH-MM-SS) z
     rozszerzeniem '.csv'.
     """
-    pass
+    now = datetime.now()
+    dir_path = os.path.join(str(woeid), now.strftime('%d-%m-%Y'))
+    file_name = "{}.csv".format(now.strftime('%H-%M-%S'))
+    return dir_path, file_name
 
 
 def save_forecast(forecast, dir, file_name):
     """
     Funkcja zapisująca obiekt typu 'dict' odpowiedzi z API do pliku 'file_name'
-    w katalogu 'dir'.
+    w katalogu podkatalogu 'dir' katalogu 'FORECASTS_DIR'.
 
     Przed zapisaniem danych do pliku należy je zamienić za pomocą funkcji
     'forecast_to_list'.
@@ -54,4 +72,17 @@ def save_forecast(forecast, dir, file_name):
 
     Separatorem w pliku '.csv' powinien być znak tabulacji ('\t').
     """
-    pass
+    if forecast is None:
+        return
+    forecast_lines = forecast_to_list(forecast)
+    path = Path(FORECASTS_DIR) / str(dir)
+    path.mkdir(parents=True, exist_ok=True)
+    with (path / file_name).open('w', newline='') as csvfile:
+        writer = csv.writer(
+            csvfile,
+            delimiter='\t',
+            quotechar='|',
+            quoting=csv.QUOTE_MINIMAL
+        )
+        for forecast_line in forecast_lines:
+            writer.writerow(forecast_line)
